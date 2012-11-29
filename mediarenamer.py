@@ -340,7 +340,7 @@ def CreateDigest(path):
                     duplicate = True
                 else:
                     digest[md5sum] = newfilename
-                    log.debug('MD5 hash for \'' + newfilename + '\': ' + md5sum)
+                    log.info('MD5 hash for \'' + newfilename + '\': ' + md5sum)
                     try:
                         digestfile = open(path + digestfilename, 'a')
                         digestfile.write(md5sum + ' ' + newfilename + '\n')
@@ -370,7 +370,10 @@ def Rename(torename, path):
         else:
             os.rename(oldname, newname)
             renamed += 1
-            log.debug('Renamed \'' + oldname + '\' to \'' + newname + '\'')
+	    if DEFAULT_LOGGING_LEVEL == logging.DEBUG:
+            	log.debug('(' + renamed + '/' + str(len(torename)) + ') Renamed \'' + oldname + '\' to \'' + newname + '\'')
+	    else:
+		log.info('(' + str(renamed) + '/' + str(len(torename)) + ') Renamed \'' + os.path.basename(oldname) + '\' to \'' + os.path.basename(newname) + '\'')
     
     log.info('Renamed ' + str(renamed) + ' files!')
 
@@ -405,34 +408,34 @@ def CompareDigests():
             destinationskipped.append(i)
     
     log.debug('Compare complete!')
-    log.debug('')
     
     # Print results
+    log.info('--------------')
     log.info('To be renamed: (' + str(len(torename)) + ')')
     log.info('--------------')
     for i in torename:
         log.info('[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\'')
-    log.info('')
     
+    log.info('------------------------------')
     log.info('Skipped due to filename match: (' + str(len(skipped)) + ')')
     log.info('------------------------------')
     for i in skipped:
         log.info('[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\'')
-    log.info('')
     
+    log.info('-----------------------------------')
     log.info('Skipped extra files in destination: (' + str(len(destinationskipped)) + ')')
     log.info('-----------------------------------')
     for i in destinationskipped:
         log.info('[' + i + '] ' + destinationdigest[i])
-    log.info('')
     
+    log.info('--------------------------------------')
     log.info('Source files missing from destination: (' + str(len(sourcedigest)) + ')')
     log.info('--------------------------------------')
     for i in sourcedigest:
         log.info('[' + i + '] \'' + sourcedigest[i])
     
     if not test:
-        log.info('Performing rename!')
+        log.info('Performing rename:')
         Rename(torename, destinationpath)
     
     return True
@@ -449,11 +452,11 @@ if action == "digest":
 elif action == "rename":
     sourcedigest = ReadDigest(sourcepath)
     if not sourcedigest:
-        log.error('EXITING ON SOURCE!')
+        log.error('Digest missing from source! Aborting!')
         sys.exit()
     destinationdigest = ReadDigest(destinationpath)
     if not destinationdigest:
-        log.error('EXITING ON DESTINATION!')
+        log.error('Digest missing from destination! Aborting!')
         sys.exit()
     
     CompareDigests()
