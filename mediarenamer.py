@@ -15,8 +15,8 @@ logging.basicConfig()
 
 # Default logging level.  
 # DEFAULT_LOGGING_LEVEL = logging.DEBUG
-# DEFAULT_LOGGING_LEVEL = logging.INFO
-DEFAULT_LOGGING_LEVEL = logging.WARN
+DEFAULT_LOGGING_LEVEL = logging.INFO
+# DEFAULT_LOGGING_LEVEL = logging.WARN
 # DEFAULT_LOGGING_LEVEL = logging.ERROR
 
 log = logging.getLogger("MediaRenamer")
@@ -139,7 +139,7 @@ def ProcessArgs():
         if not CheckPath(digestpath):
             parser.error("Failed to check path!")
         if test:
-            print "Ignoring unneeded argument, --test/-t."
+            log.warn("Ignoring unneeded argument, --test/-t.")
     elif options.rename:
         action = "rename"
         # Check for both paths
@@ -162,7 +162,7 @@ def CheckPath(path):
         if os.path.exists(path):
             return True
     except:
-        print "Error checking path: " + path
+        log.error("Error checking path: " + path)
         return False
 
 
@@ -182,15 +182,14 @@ def ReadDigest(path):
                 if RE_MD5HASH.match(line):
                     split = line.split(' ', 1)
                     if digest.has_key(split[0]):
-                        print 'Duplicate files found'
-                        print split[0] + ' ' + split[1] + ' (Skipping)'
-                        print split[0] + ' ' + digest[split[0]] + ' (Keeping)'
+                        log.warn('Duplicate files found')
+                        log.warn(split[0] + ' ' + split[1] + ' (Skipping)')
+                        log.warn(split[0] + ' ' + digest[split[0]] + ' (Keeping)')
                     else:
                         digest[split[0]] = split[1]
-                        if DEBUG:
-                            print 'DEBUG: Read in MD5 hash for ' + split[1] + ': ' + split[0]
+                        log.debug('Read in MD5 hash for ' + split[1] + ': ' + split[0])
                 else:
-                    print 'Skipping invalid line: ' + line
+                    log.warn('Skipping invalid digest line: ' + line)
         f.close() 
             
     except:
@@ -298,15 +297,15 @@ def CreateDigest(path):
     if not CheckPath(path):
         sys.exit()
     if not os.access(path, os.W_OK):
-        print 'Cannot write digest to ' + path
+        log.error('Cannot write digest to ' + path)
         sys.exit()
     if not os.access(path, os.R_OK):
-        print 'Cannot read from ' + path
+        log.error('Cannot read from ' + path)
         sys.exit()
         
     # Check for existing digest
     if os.path.exists(path + digestfilename):
-        print 'Digest already exists at ' + path + digestfilename
+        log.error('Digest already exists at ' + path + digestfilename)
         sys.exit()
            
     
@@ -335,24 +334,25 @@ def CreateDigest(path):
                 
                 # Check for duplicates
                 if digest.has_key(md5sum):
-                    print 'Duplicate files found:'
-                    print md5sum + ' ' + newfile + ' (Skipping)'
-                    print md5sum + ' ' + digest[md5sum] + ' (Keeping)'
+                    log.warn('Duplicate files found:')
+                    log.warn(md5sum + ' ' + newfile + ' (Skipping)')
+                    log.warn( md5sum + ' ' + digest[md5sum] + ' (Keeping)')
                     duplicate = True
                 else:
                     digest[md5sum] = newfilename
-                    if DEBUG:
-                        print 'DEBUG: MD5 hash for \'' + newfilename + '\': ' + md5sum
+                    log.debug('MD5 hash for \'' + newfilename + '\': ' + md5sum)
                     try:
                         digestfile = open(path + digestfilename, 'a')
                         digestfile.write(md5sum + ' ' + newfilename + '\n')
                         digestfile.close()
                     except:
-                        print 'Issues accessing the path to write the digest.  Aborting!'
+                        log.error('Issues accessing the path to write the digest.  Aborting!')
                         sys.exit()
     if len(digest) == 0:
-        print "No files found!"
-               
+        log.error('No files found!')
+    else:
+        log.info('Created digest out of ' + str(len(digest)) + ' files.')
+        log.debug('Digest location: ' + path)       
                 
 def Rename(torename, path):
     
@@ -364,24 +364,23 @@ def Rename(torename, path):
         
         # Check if file exists at path
         if not os.path.exists(oldname):
-            print 'ERROR: File \'' + oldname + '\' doesn\'t exist!  Skipping!'
+            log.warn('ERROR: File \'' + oldname + '\' doesn\'t exist!  Skipping!')
         # elif not os.access(i[1], os.W_OK):
         #    print 'ERROR: Cannot access file  for writing! Skipping!'
         else:
             os.rename(oldname, newname)
             renamed += 1
-            if DEBUG:
-                print 'DEBUG: Renamed \'' + oldname + '\' to \'' + newname + '\''
+            log.debug('Renamed \'' + oldname + '\' to \'' + newname + '\'')
     
-    print 'Renamed ' + str(renamed) + ' files!'
+    log.info('Renamed ' + str(renamed) + ' files!')
 
 
 def CompareDigests():
     if len(sourcedigest) == 0:
-        print 'No files found in source digest! Aborting...'
+        log.error('No files found in source digest! Aborting...')
         return False
     elif len(destinationdigest) == 0:
-        print 'No files found in destination digest! Aborting...'
+        log.error('No files found in destination digest! Aborting...')
         return False
     
     torename = []
@@ -405,36 +404,35 @@ def CompareDigests():
         else:
             destinationskipped.append(i)
     
-    if DEBUG:
-        print 'Compare complete!'
-        print ''
+    log.debug('Compare complete!')
+    log.debug('')
     
     # Print results
-    print 'To be renamed: (' + str(len(torename)) + ')'
-    print '--------------'
+    log.info('To be renamed: (' + str(len(torename)) + ')')
+    log.info('--------------')
     for i in torename:
-        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\''
-    print ''
+        log.info('[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\'')
+    log.info('')
     
-    print 'Skipped due to filename match: (' + str(len(skipped)) + ')'
-    print '------------------------------'
+    log.info('Skipped due to filename match: (' + str(len(skipped)) + ')')
+    log.info('------------------------------')
     for i in skipped:
-        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\''
-    print ''
+        log.info('[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\'')
+    log.info('')
     
-    print 'Skipped extra files in destination: (' + str(len(destinationskipped)) + ')'
-    print '-----------------------------------'
+    log.info('Skipped extra files in destination: (' + str(len(destinationskipped)) + ')')
+    log.info('-----------------------------------')
     for i in destinationskipped:
-        print '[' + i + '] ' + destinationdigest[i]
-    print ''
+        log.info('[' + i + '] ' + destinationdigest[i])
+    log.info('')
     
-    print 'Source files missing from destination: (' + str(len(sourcedigest)) + ')'
-    print '--------------------------------------'
+    log.info('Source files missing from destination: (' + str(len(sourcedigest)) + ')')
+    log.info('--------------------------------------')
     for i in sourcedigest:
-        print '[' + i + '] \'' + sourcedigest[i]
+        log.info('[' + i + '] \'' + sourcedigest[i])
     
     if not test:
-        print 'Performing rename!'
+        log.info('Performing rename!')
         Rename(torename, destinationpath)
     
     return True
@@ -451,11 +449,11 @@ if action == "digest":
 elif action == "rename":
     sourcedigest = ReadDigest(sourcepath)
     if not sourcedigest:
-        print 'EXITING ON SOURCE!'
+        log.error('EXITING ON SOURCE!')
         sys.exit()
     destinationdigest = ReadDigest(destinationpath)
     if not destinationdigest:
-        print 'EXITING ON DESTINATION!'
+        log.error('EXITING ON DESTINATION!')
         sys.exit()
     
     CompareDigests()
