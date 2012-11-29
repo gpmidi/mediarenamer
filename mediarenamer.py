@@ -1,15 +1,22 @@
 #!/usr/bin/python
+""" This script will compare two media directories (source and
+destination), create an md5sum digest of all files in both,
+and rename files in the destination, if any checksums match.
 
-# This script will compare two media directories (source and
-# destination), create an md5sum digest of all files in both,
-# and rename files in the destination, if any checksums match.
+By rickatnight11
 
+Patches by: 
+- Paulson McIntyre (GpMidi) <paul@gpmidi.net>
+
+"""
 import sys
 import os
 from optparse import OptionParser
 import hashlib
 import re
+import subprocess
 
+# TODO: Move the / to the path concatenation. Also change to use os.path.join. 
 digestfilename = '/md5digest.txt'
 DEBUG = True
 test = False
@@ -20,8 +27,24 @@ destinationpath = ""
 digestpath = ""
 sourcedigest = {}
 destinationdigest = {}
+# Path to the MD5 checksum CLI app
+md5app = '/usr/sbin/md5sum'
 
+# Grab an MD5 with a space on the end
 RE_MD5HASH = re.compile(r'([a-fA-F\d]{32})\s.+')
+# Grab an MD5 only
+RE_MD5HASH_PULL = re.compile(r'([a-fA-F\d]{32})')
+
+# Exceptions
+class FileReadError(IOError):
+    """ Couldn't find the given file or no permissions to access it """
+
+class ExternalHashError(RuntimeError):
+    """ Failed to use an external app to hash a file. """
+
+class ExternalHashValidationError(ValueError):
+    """ Couldn't find an MD5 checksum in the MD5 checksum app output """
+
 
 def ProcessArgs():
     
@@ -30,16 +53,21 @@ def ProcessArgs():
     global sourcepath
     global destinationpath
     global digestpath
+    global md5app
     
     # Define option/argument parser
     parser = OptionParser(usage = 'usage: %prog (-d|--digest) PATH \n %prog (-r|--rename) [-t|--test] SOURCEPATH DESTINATIONPATH', version = '%prog 0.1')
     parser.add_option('-t', '--test', action = 'store_true', dest = 'test', help = 'do not perform rename; only print output')
     parser.add_option('-d', '--digest', action = 'store_true', dest = 'digest', help = 'generate new md5 hash digest')
     parser.add_option('-r', '--rename', action = 'store_true', dest = 'rename', help = 'compare digests and rename files at destination')
+    parser.add_option('--md5app', action = 'store', dest = 'md5app', default = md5app, help = 'The path to an external MD5 checksum program. Use "" to disable external MD5 app usage. [default: %default]')
         
     (options, args) = parser.parse_args()
     
     test = options.test
+    
+    # Save MD5 checksum app, if defined. 
+    md5app = options.md5app
     
     # Check desired action, digest or rename
     if options.digest and options.rename:
@@ -71,6 +99,7 @@ def ProcessArgs():
     else:
         parser.error("Must select either digest or rename!")
     
+    
 def CheckPath(path):
     try:
         if os.path.exists(path):
@@ -78,6 +107,7 @@ def CheckPath(path):
     except:
         print "Error checking path: " + path
         return False
+
 
 def ReadDigest(path):
     if not CheckPath(path + digestfilename):
@@ -111,8 +141,8 @@ def ReadDigest(path):
         return False
     return digest
 
-def GenerateMd5(path):
-    
+
+def _GenerateMd5PurePy(path):
     """Compute md5 hash of the specified file
     m = hashlib.md5()
     try:
@@ -139,6 +169,58 @@ def GenerateMd5(path):
             block = f.read(csize)
     
     return md5sum.hexdigest()
+
+
+def _GenerateMd5External(path):
+    """ Use an external MD5 hashing app to generate 
+    the MD5 checksum. May be faster than the pure-python
+    approach. 
+    """
+    assert os.access(path, os.R_OK)
+    assert os.access(md5app, os.R_OK | os.X_OK)
+    
+    cmdline = [md5app, path]
+    
+    prehash = ''
+    p = subprocess.Popen(cmdline, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    while True:
+        rc = p.poll()
+        prehash += p.stdout.read()
+        if rc is not None:
+            break
+    # Validate return code
+    if rc == 0:
+        # Validate the hash
+        m = RE_MD5HASH_PULL.findall(prehash)
+        if len(m) == 1:
+            # Have a valid hash
+            return m[0]
+        elif len(m) > 1:
+            # Multiple matches
+            raise ExternalHashValidationError, "Found %d MD5s in %r. Not sure which to use. " % (len(m), prehash)
+        else:
+            # Invalid hash
+            raise ExternalHashValidationError, "Couldn't find a valid hash in %r" % prehash
+    else:
+        raise ExternalHashError, "%r exited with a return code of %d" % (md5app, rc)
+        
+    
+def GenerateMd5(path):
+    """ Return the MD5 checksum for the given file. The
+    hash result should be in a 32 char string in hex format. 
+    """
+    if not os.access(path, os.R_OK):
+        raise FileReadError, "Couldn't read %r" % path
+    
+    # TODO: Add debug logging to this
+    if os.access(md5app, os.R_OK | os.X_OK):
+        try:
+            return _GenerateMd5External(path = path)
+        except Exception, e:
+            return _GenerateMd5PurePy(path = path)
+    else:
+        return _GenerateMd5PurePy(path = path)
+        
         
 def CreateDigest(path):
     
@@ -200,6 +282,7 @@ def CreateDigest(path):
                         sys.exit()
     if len(digest) == 0:
         print "No files found!"
+               
                 
 def Rename(torename, path):
     
@@ -221,6 +304,7 @@ def Rename(torename, path):
                 print 'DEBUG: Renamed \'' + oldname + '\' to \'' + newname + '\''
     
     print 'Renamed ' + str(renamed) + ' files!'
+
 
 def CompareDigests():
     if len(sourcedigest) == 0:
