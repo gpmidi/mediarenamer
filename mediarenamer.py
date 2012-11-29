@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-#This script will compare two media directories (source and
-#destination), create an md5sum digest of all files in both,
-#and rename files in the destination, if any checksums match.
+# This script will compare two media directories (source and
+# destination), create an md5sum digest of all files in both,
+# and rename files in the destination, if any checksums match.
 
 import sys
 import os
@@ -31,17 +31,17 @@ def ProcessArgs():
     global destinationpath
     global digestpath
     
-    #Define option/argument parser
-    parser = OptionParser(usage='usage: %prog (-d|--digest) PATH \n %prog (-r|--rename) [-t|--test] SOURCEPATH DESTINATIONPATH', version='%prog 0.1')
-    parser.add_option('-t', '--test', action='store_true', dest='test', help='do not perform rename; only print output')
-    parser.add_option('-d', '--digest', action='store_true', dest='digest', help='generate new md5 hash digest')
-    parser.add_option('-r', '--rename', action='store_true', dest='rename', help='compare digests and rename files at destination')
+    # Define option/argument parser
+    parser = OptionParser(usage = 'usage: %prog (-d|--digest) PATH \n %prog (-r|--rename) [-t|--test] SOURCEPATH DESTINATIONPATH', version = '%prog 0.1')
+    parser.add_option('-t', '--test', action = 'store_true', dest = 'test', help = 'do not perform rename; only print output')
+    parser.add_option('-d', '--digest', action = 'store_true', dest = 'digest', help = 'generate new md5 hash digest')
+    parser.add_option('-r', '--rename', action = 'store_true', dest = 'rename', help = 'compare digests and rename files at destination')
         
     (options, args) = parser.parse_args()
     
     test = options.test
     
-    #Check desired action, digest or rename
+    # Check desired action, digest or rename
     if options.digest and options.rename:
         parser.error("Digest and Rename actions are mutually exclusive!")
     elif options.digest:
@@ -56,8 +56,8 @@ def ProcessArgs():
         if test:
             print "Ignoring unneeded argument, --test/-t."
     elif options.rename:
-        action= "rename"
-        #Check for both paths
+        action = "rename"
+        # Check for both paths
         if len(args) < 2:
             parser.error("Please provide both source and destination paths!")
         elif len(args) > 2:
@@ -142,7 +142,7 @@ def GenerateMd5(path):
         
 def CreateDigest(path):
     
-    #Check that path exists and is writable
+    # Check that path exists and is writable
     if not CheckPath(path):
         sys.exit()
     if not os.access(path, os.W_OK):
@@ -152,36 +152,36 @@ def CreateDigest(path):
         print 'Cannot read from ' + path
         sys.exit()
         
-    #Check for existing digest
+    # Check for existing digest
     if os.path.exists(path + digestfilename):
         print 'Digest already exists at ' + path + digestfilename
         sys.exit()
            
     
-    #Include switch in case of duplicate files
+    # Include switch in case of duplicate files
     global duplicate
     
-    #Create digest dictionary
+    # Create digest dictionary
     digest = {}
     
-    #Generate list of files
+    # Generate list of files
     files = os.walk(path)
     
-    #Create populate digest dictionary with md5 hash info
+    # Create populate digest dictionary with md5 hash info
     for entry in files:
         if len(entry[2]) > 0:
             for tempfile in entry[2]:
                 
-                #Absolute file path (only used to generate md5 hash)
-                newfile = os.path.join(entry[0],tempfile)
+                # Absolute file path (only used to generate md5 hash)
+                newfile = os.path.join(entry[0], tempfile)
                 
-                #Relative file path (saved to digest)
+                # Relative file path (saved to digest)
                 newfilename = os.path.relpath(newfile, path)
                 
-                #Generate md5sum hash
+                # Generate md5sum hash
                 md5sum = GenerateMd5(newfile)
                 
-                #Check for duplicates
+                # Check for duplicates
                 if digest.has_key(md5sum):
                     print 'Duplicate files found:'
                     print md5sum + ' ' + newfile + ' (Skipping)'
@@ -209,10 +209,10 @@ def Rename(torename, path):
         oldname = os.path.abspath(os.path.join(path, i[1]))
         newname = os.path.abspath(os.path.join(path, i[2]))
         
-        #Check if file exists at path
+        # Check if file exists at path
         if not os.path.exists(oldname):
             print 'ERROR: File \'' + oldname + '\' doesn\'t exist!  Skipping!'
-        #elif not os.access(i[1], os.W_OK):
+        # elif not os.access(i[1], os.W_OK):
         #    print 'ERROR: Cannot access file  for writing! Skipping!'
         else:
             os.rename(oldname, newname)
@@ -234,20 +234,20 @@ def CompareDigests():
     skipped = []
     destinationskipped = []
     
-    #Iterate through destination digest to look for matching md5 hashes in source digest
+    # Iterate through destination digest to look for matching md5 hashes in source digest
     for i in destinationdigest:
-        #Match
+        # Match
         if sourcedigest.has_key(i):
-            #Only add to rename list, if the filenames are different
+            # Only add to rename list, if the filenames are different
             if os.path.basename(destinationdigest[i]) != os.path.basename(sourcedigest[i]):
                 newfilename = os.path.basename(sourcedigest[i])
                 torename.append((i, destinationdigest[i], os.path.join(os.path.dirname(sourcedigest[i]), newfilename)))
                 del sourcedigest[i]
-            #Filenames match, so add to skip list
+            # Filenames match, so add to skip list
             else:
                 skipped.append((i, sourcedigest[i], destinationdigest[i]))
                 del sourcedigest[i]
-        #No match, so added to destination skip list
+        # No match, so added to destination skip list
         else:
             destinationskipped.append(i)
     
@@ -255,17 +255,17 @@ def CompareDigests():
         print 'Compare complete!'
         print ''
     
-    #Print results
+    # Print results
     print 'To be renamed: (' + str(len(torename)) + ')'
     print '--------------'
     for i in torename:
-        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] +'\''
+        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\''
     print ''
     
     print 'Skipped due to filename match: (' + str(len(skipped)) + ')'
     print '------------------------------'
     for i in skipped:
-        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] +'\''
+        print '[' + i[0] + '] \'' + i[1] + '\' to \'' + i[2] + '\''
     print ''
     
     print 'Skipped extra files in destination: (' + str(len(destinationskipped)) + ')'
@@ -286,14 +286,14 @@ def CompareDigests():
     return True
 
 
-#Main program
+# Main program
 ProcessArgs()
 
-#Generate digest
+# Generate digest
 if action == "digest":
     CreateDigest(digestpath)
 
-#Compare digests and rename
+# Compare digests and rename
 elif action == "rename":
     sourcedigest = ReadDigest(sourcepath)
     if not sourcedigest:
