@@ -1,8 +1,13 @@
 #!/usr/bin/python
-
+#
+#This code is not bound by any license or copyright and has no restrictions of its use.
+#I am not liable for any damage, as a result of using this script.  The user is responsible
+#for any outcome from using this script.
+# 
 #This script will compare two media directories (source and
 #destination), create an md5sum digest of all files in both,
 #and rename files in the destination, if any checksums match.
+
 
 import sys
 import os
