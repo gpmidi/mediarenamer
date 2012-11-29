@@ -9,6 +9,21 @@ Patches by:
 - Paulson McIntyre (GpMidi) <paul@gpmidi.net>
 
 """
+# Logging S&C
+import logging
+logging.basicConfig()
+
+# Default logging level.  
+# DEFAULT_LOGGING_LEVEL = logging.DEBUG
+# DEFAULT_LOGGING_LEVEL = logging.INFO
+DEFAULT_LOGGING_LEVEL = logging.WARN
+# DEFAULT_LOGGING_LEVEL = logging.ERROR
+
+log = logging.getLogger("MediaRenamer")
+log.setLevel(DEFAULT_LOGGING_LEVEL)
+
+log.debug('Inited logging')
+
 import sys
 import os
 from optparse import OptionParser
@@ -28,7 +43,7 @@ digestpath = ""
 sourcedigest = {}
 destinationdigest = {}
 # Path to the MD5 checksum CLI app
-md5app = '/usr/sbin/md5sum'
+md5app = '/usr/bin/md5sum'
 
 # Grab an MD5 with a space on the end
 RE_MD5HASH = re.compile(r'([a-fA-F\d]{32})\s.+')
@@ -56,18 +71,60 @@ def ProcessArgs():
     global md5app
     
     # Define option/argument parser
-    parser = OptionParser(usage = 'usage: %prog (-d|--digest) PATH \n %prog (-r|--rename) [-t|--test] SOURCEPATH DESTINATIONPATH', version = '%prog 0.1')
-    parser.add_option('-t', '--test', action = 'store_true', dest = 'test', help = 'do not perform rename; only print output')
-    parser.add_option('-d', '--digest', action = 'store_true', dest = 'digest', help = 'generate new md5 hash digest')
-    parser.add_option('-r', '--rename', action = 'store_true', dest = 'rename', help = 'compare digests and rename files at destination')
-    parser.add_option('--md5app', action = 'store', dest = 'md5app', default = md5app, help = 'The path to an external MD5 checksum program. Use "" to disable external MD5 app usage. [default: %default]')
+    parser = OptionParser(
+                          usage = 'usage: %prog (-d|--digest) PATH \n %prog (-r|--rename) [-t|--test] SOURCEPATH DESTINATIONPATH',
+                          version = '%prog 0.1',
+                          )
+    parser.add_option(
+                      '-t',
+                      '--test',
+                      action = 'store_true',
+                      dest = 'test',
+                      help = 'do not perform rename; only print output',
+                      )
+    parser.add_option(
+                      '-d',
+                      '--digest',
+                      action = 'store_true',
+                      dest = 'digest',
+                      help = 'generate new md5 hash digest',
+                      )
+    parser.add_option(
+                      '-r',
+                      '--rename',
+                      action = 'store_true',
+                      dest = 'rename',
+                      help = 'compare digests and rename files at destination',
+                      )
+    parser.add_option(
+                      '--md5app',
+                      action = 'store',
+                      dest = 'md5app',
+                      default = md5app,
+                      help = 'The path to an external MD5 checksum program. Use "" to disable external MD5 app usage. [default: %default]',
+                      )
+    parser.add_option(
+                      '-v',
+                      '--verbose',
+                      action = 'store_true',
+                      dest = 'verbose',
+                      default = False,
+                      help = 'Enable verbose output. [default: %default]',
+                      )    
         
     (options, args) = parser.parse_args()
+    log.debug('Parsed opts')
     
+    if options.verbose:
+        log.setLevel(logging.DEBUG)
+        log.debug("Verbose logging enabled")
+        
     test = options.test
+    log.debug('Test: %r', test)
     
     # Save MD5 checksum app, if defined. 
     md5app = options.md5app
+    log.debug('MD5 app: %r', md5app)
     
     # Check desired action, digest or rename
     if options.digest and options.rename:
@@ -137,7 +194,7 @@ def ReadDigest(path):
         f.close() 
             
     except:
-        print 'Error reading digest!'
+        log.error('Error reading digest!')
         return False
     return digest
 
@@ -158,9 +215,10 @@ def _GenerateMd5PurePy(path):
         m.update(eachLine)
     m.update(includeLine)
     return m.hexdigest()"""
-    
     csize = 4096
     md5sum = hashlib.md5()
+    
+    log.debug('Doing pure-python MD5 with a chunk size of %d', csize)
     
     with open(path, 'rb') as f:
         block = f.read(csize)
@@ -168,6 +226,7 @@ def _GenerateMd5PurePy(path):
             md5sum.update(block)
             block = f.read(csize)
     
+    log.debug('Done generating digest')
     return md5sum.hexdigest()
 
 
@@ -179,7 +238,11 @@ def _GenerateMd5External(path):
     assert os.access(path, os.R_OK)
     assert os.access(md5app, os.R_OK | os.X_OK)
     
+    log.debug('Doing external hash of %r using %r', path, md5app)
+    
     cmdline = [md5app, path]
+    
+    log.debug('Command line: %r', cmdline)
     
     prehash = ''
     p = subprocess.Popen(cmdline, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
@@ -194,14 +257,18 @@ def _GenerateMd5External(path):
         m = RE_MD5HASH_PULL.findall(prehash)
         if len(m) == 1:
             # Have a valid hash
+            log.debug('Done generating hash %r', m[0])
             return m[0]
         elif len(m) > 1:
             # Multiple matches
+            log.warn("Found %d MD5s in %r. Not sure which to use. " , len(m), prehash)
             raise ExternalHashValidationError, "Found %d MD5s in %r. Not sure which to use. " % (len(m), prehash)
         else:
             # Invalid hash
+            log.warn("Couldn't find a valid hash in %r", prehash)
             raise ExternalHashValidationError, "Couldn't find a valid hash in %r" % prehash
     else:
+        log.warn("%r exited with a return code of %d", md5app, rc)
         raise ExternalHashError, "%r exited with a return code of %d" % (md5app, rc)
         
     
@@ -209,7 +276,9 @@ def GenerateMd5(path):
     """ Return the MD5 checksum for the given file. The
     hash result should be in a 32 char string in hex format. 
     """
+    log.debug('Going to hash %r', path)
     if not os.access(path, os.R_OK):
+        log.error("Couldn't read file %r", path)
         raise FileReadError, "Couldn't read %r" % path
     
     # TODO: Add debug logging to this
@@ -217,6 +286,7 @@ def GenerateMd5(path):
         try:
             return _GenerateMd5External(path = path)
         except Exception, e:
+            log.exception('External MD5 failed, falling back to pure-python')
             return _GenerateMd5PurePy(path = path)
     else:
         return _GenerateMd5PurePy(path = path)
