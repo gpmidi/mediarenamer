@@ -371,7 +371,7 @@ def Rename(torename, path):
             os.rename(oldname, newname)
             renamed += 1
 	    if DEFAULT_LOGGING_LEVEL == logging.DEBUG:
-            	log.debug('(' + renamed + '/' + str(len(torename)) + ') Renamed \'' + oldname + '\' to \'' + newname + '\'')
+            	log.debug('(' + str(renamed) + '/' + str(len(torename)) + ') Renamed \'' + oldname + '\' to \'' + newname + '\'')
 	    else:
 		log.info('(' + str(renamed) + '/' + str(len(torename)) + ') Renamed \'' + os.path.basename(oldname) + '\' to \'' + os.path.basename(newname) + '\'')
     
